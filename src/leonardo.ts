@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import sharp from "sharp";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
+import { defaultChromePath } from "./platform.js";
 
 export type LeonardoImageRequest = {
   prompt: string;
@@ -19,9 +20,7 @@ export type LeonardoImageServiceOptions = {
   maxAttempts?: number;
 };
 
-const defaultChrome = process.platform === "darwin"
-  ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-  : undefined;
+const defaultChrome = defaultChromePath();
 const defaultGeneratorUrl = "https://app.leonardo.ai/generate?model=auto-preset&aspectRatio=1%3A1&style=a5632c7c-ddbb-4e2f-ba34-8456ab3ac436&mode=fast&quantity=1&seedEnabled=false&negativePromptEnabled=false";
 
 type GenerationFailureKind = "moderation" | "credits" | "rate-limit" | "authentication" | "generation";

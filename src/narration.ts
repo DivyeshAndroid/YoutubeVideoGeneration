@@ -27,6 +27,19 @@ function runWithInput(command: string, args: string[], input: string): Promise<v
   });
 }
 
+function windowsSpeech(text: string, destination: string): Promise<void> {
+  const script = [
+    "Add-Type -AssemblyName System.Speech",
+    "$voice = New-Object System.Speech.Synthesis.SpeechSynthesizer",
+    `$voice.Rate = ${Math.max(-10, Math.min(10, Math.round((config.VOICESTUDIO_SPEED - 1) * 10)))}`,
+    `$voice.SetOutputToWaveFile('${destination.replace(/'/g, "''")}')`,
+    "$inputText = [Console]::In.ReadToEnd()",
+    "$voice.Speak($inputText)",
+    "$voice.Dispose()"
+  ].join("; ");
+  return runWithInput("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], text);
+}
+
 function probeDuration(file: string): Promise<number> {
   return new Promise((resolve, reject) => {
     const child = spawn(ffmpeg, ["-i", file, "-f", "null", "-"], { stdio: ["ignore", "ignore", "pipe"] });
@@ -117,11 +130,15 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
             await run(ffmpeg, ["-y", "-i", wav, "-c:a", "aac", "-b:a", config.AUDIO_BITRATE, output]);
           } catch (piperError) {
             console.warn("Piper is unavailable; trying the operating-system voice fallback.", piperError);
-            if (process.platform !== "darwin") throw piperError;
-            const fallbackWav = path.join(narrationDir, `scene-${index}.say.wav`);
-            await run("/usr/bin/say", ["-v", "Samantha", "--file-format=WAVE", "--data-format=LEI16@22050", "-o", fallbackWav, narration]);
+            if (process.platform !== "darwin" && process.platform !== "win32") throw piperError;
+            const fallbackWav = path.join(narrationDir, `scene-${index}.system.wav`);
+            if (process.platform === "win32") {
+              await windowsSpeech(narration, fallbackWav);
+            } else {
+              await run("/usr/bin/say", ["-v", "Samantha", "--file-format=WAVE", "--data-format=LEI16@22050", "-o", fallbackWav, narration]);
+            }
             if ((await fs.stat(fallbackWav)).size < 8192) {
-              throw new Error("macOS speech synthesis returned an empty audio file");
+              throw new Error("Operating-system speech synthesis returned an empty audio file");
             }
             await run(ffmpeg, ["-y", "-i", fallbackWav, "-c:a", "aac", "-b:a", config.AUDIO_BITRATE, output]);
           }

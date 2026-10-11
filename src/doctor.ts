@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import ffmpegPath from "ffmpeg-static";
 import { config } from "./config.js";
+import { defaultChromePath, defaultVoiceStudioPath } from "./platform.js";
 
 function commandVersion(command: string, args = ["--version"]): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -55,11 +56,11 @@ export async function doctor() {
       return `${config.COMFYUI_CHECKPOINT} configured`;
     }]);
   if (config.IMAGE_MODE === "leonardo") {
-    checks.push(["Chrome for Leonardo", async () => accessibleFile(config.LEONARDO_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")]);
+    checks.push(["Chrome for Leonardo", async () => accessibleFile(config.LEONARDO_CHROME_PATH ?? defaultChromePath() ?? "Chrome executable not detected; set LEONARDO_CHROME_PATH")]);
   }
   if (config.NARRATION_PROVIDER === "voicestudio") {
-    checks.push(["VoiceStudio application", async () => accessibleFile(config.VOICESTUDIO_APP_PATH ?? "/Applications/VoiceStudio.app/Contents/MacOS/VoiceStudio")]);
-    checks.push(["Chrome for Clipchamp fallback", async () => accessibleFile(config.CLIPCHAMP_CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")]);
+    checks.push(["VoiceStudio application", async () => accessibleFile(config.VOICESTUDIO_APP_PATH ?? defaultVoiceStudioPath() ?? "VoiceStudio executable not detected; set VOICESTUDIO_APP_PATH")]);
+    checks.push(["Chrome for Clipchamp fallback", async () => accessibleFile(config.CLIPCHAMP_CHROME_PATH ?? defaultChromePath() ?? "Chrome executable not detected; set CLIPCHAMP_CHROME_PATH")]);
   }
   if (config.YOUTUBE_UPLOAD_ENABLED) {
     checks.push(["YouTube OAuth client", async () => accessibleFile(config.YOUTUBE_CLIENT_SECRET_FILE)]);

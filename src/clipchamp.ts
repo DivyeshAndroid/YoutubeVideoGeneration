@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
+import { defaultChromePath } from "./platform.js";
 
 export type ClipchampVoiceRequest = {
   text: string;
@@ -16,9 +17,7 @@ export type ClipchampVoiceServiceOptions = {
   timeoutMs?: number;
 };
 
-const defaultChrome = process.platform === "darwin"
-  ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-  : undefined;
+const defaultChrome = defaultChromePath();
 
 /** Automates Clipchamp text-to-speech through a reusable, persistent Chrome session. */
 export class ClipchampVoiceService {

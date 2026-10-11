@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { defaultVoiceStudioPath } from "./platform.js";
 
 export type VoiceStudioRequest = {
   text: string;
@@ -21,9 +22,7 @@ export type VoiceStudioServiceOptions = {
   startupTimeoutMs?: number;
 };
 
-const defaultExecutable = process.platform === "darwin"
-  ? "/Applications/VoiceStudio.app/Contents/MacOS/VoiceStudio"
-  : undefined;
+const defaultExecutable = defaultVoiceStudioPath();
 
 /** Uses the local API provided by the installed VoiceStudio desktop app. */
 export class VoiceStudioService {

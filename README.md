@@ -1,6 +1,6 @@
 # Automated YouTube Video Generator
 
-A local, headless pipeline that turns structured content or freshly researched trending news into an illustrated vertical YouTube Short of up to 60 seconds, then optionally uploads it on a recurring schedule.
+A cross-platform Node.js pipeline for Windows and macOS that turns structured content or freshly researched trending news into an illustrated vertical YouTube Short of up to 60 seconds, then optionally uploads it on a recurring schedule.
 
 ## Quick start
 
@@ -91,7 +91,7 @@ Clipchamp is a browser UI rather than a stable public text-to-speech API, so Mic
 
 For an offline fallback, set `NARRATION_PROVIDER=local` and configure `PIPER_COMMAND` and `PIPER_MODEL`. On macOS, the built-in `say` voice is used if Piper is unavailable.
 
-With `NARRATION_PROVIDER=voicestudio`, the service calls VoiceStudio's local API and, on macOS, starts `/Applications/VoiceStudio.app` automatically when needed. Choose a saved clone or designed voice with `VOICESTUDIO_PROFILE_ID`; leave it blank to use VoiceStudio's default. `VOICESTUDIO_LANGUAGE`, `VOICESTUDIO_INSTRUCT`, `VOICESTUDIO_SPEED` (1.25× by default), and `VOICESTUDIO_STEPS` control pronunciation, delivery, speed, and quality. A VoiceStudio failure disables further retries during that run and sends the current and remaining scenes to Clipchamp.
+With `NARRATION_PROVIDER=voicestudio`, the service calls VoiceStudio's local API and starts a standard macOS or Windows installation automatically when needed. Choose a saved clone or designed voice with `VOICESTUDIO_PROFILE_ID`; leave it blank to use VoiceStudio's default. `VOICESTUDIO_LANGUAGE`, `VOICESTUDIO_INSTRUCT`, `VOICESTUDIO_SPEED` (1.25× by default), and `VOICESTUDIO_STEPS` control pronunciation, delivery, speed, and quality. A VoiceStudio failure disables further retries during that run and sends the current and remaining scenes to Clipchamp.
 
 Generate one WAV file directly:
 
@@ -121,7 +121,7 @@ npm run scheduler
 
 For a machine that restarts, run this command using a process manager such as `pm2`, a macOS LaunchAgent, or systemd. The scheduler prevents overlapping runs.
 
-### macOS background service
+### Background service
 
 Install the included LaunchAgent to keep the scheduler running independently of Codex and Terminal. It starts at login, restarts after failures, reads `CRON_SCHEDULE` and `TIMEZONE` from `.env`, and writes logs under `work/`:
 
@@ -130,6 +130,14 @@ npm run service:install
 ```
 
 Remove it with `npm run service:uninstall`. The active production configuration runs every four hours in Asia/Kolkata, anchored at 3:00, 7:00, 11:00, 15:00, 19:00, and 23:00 so the evening peak is included.
+
+On Windows, open PowerShell in the repository and install the per-user Task Scheduler job:
+
+```powershell
+npm run service:install
+```
+
+Remove it with `npm run service:uninstall`. Chrome and VoiceStudio are detected in their standard Windows installation locations; set `CLIPCHAMP_CHROME_PATH`, `LEONARDO_CHROME_PATH`, or `VOICESTUDIO_APP_PATH` only for custom locations.
 
 ## Commands
 

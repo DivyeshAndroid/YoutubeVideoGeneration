@@ -39,5 +39,7 @@ export async function cleanupPipelineRun(content?: VideoContent): Promise<void> 
 
   if (process.platform === "darwin" && config.NARRATION_PROVIDER === "voicestudio") {
     await runQuietly("/usr/bin/osascript", ["-e", "tell application \"VoiceStudio\" to quit"]);
+  } else if (process.platform === "win32" && config.NARRATION_PROVIDER === "voicestudio") {
+    await runQuietly("taskkill.exe", ["/IM", "VoiceStudio.exe", "/T"]);
   }
 }

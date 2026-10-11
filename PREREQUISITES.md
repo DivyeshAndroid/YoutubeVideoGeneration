@@ -4,7 +4,7 @@ This repository runs a local news-to-YouTube-Short pipeline. Requirements depend
 
 ## Required for every configuration
 
-- macOS 13 or newer for the included VoiceStudio, Clipchamp, and LaunchAgent integration. Core Node.js generation can be adapted to Linux.
+- Windows 10/11 (64-bit) or macOS 13+. Linux can run the core pipeline but does not include a bundled background-service installer.
 - Node.js 20 or newer and npm 10 or newer. Node.js 24 is the tested local version.
 - Git for cloning and maintaining the repository.
 - Internet access for news feeds, Codex, Leonardo/Clipchamp, and YouTube.
@@ -37,11 +37,11 @@ The default `NARRATION_PROVIDER=voicestudio` requires:
 
 - VoiceStudio installed at `VOICESTUDIO_APP_PATH`.
 - A compatible TTS model installed inside VoiceStudio.
-- Its local API available at `VOICESTUDIO_BASE_URL`; the pipeline can start the app automatically on macOS.
+- Its local API available at `VOICESTUDIO_BASE_URL`; the pipeline can start standard macOS and Windows installations automatically.
 
 If VoiceStudio fails, Clipchamp is used automatically. Clipchamp requires Google Chrome, a Microsoft account, and a saved first-run login in `CLIPCHAMP_USER_DATA_DIR`.
 
-For a fully local alternative, choose `NARRATION_PROVIDER=local` and install Piper plus the configured `.onnx` voice. macOS `say` is the final local fallback.
+For a fully local alternative, choose `NARRATION_PROVIDER=local` and install Piper plus the configured `.onnx` voice. If Piper is unavailable, macOS uses `say` and Windows uses the built-in System.Speech engine.
 
 ## YouTube upload
 
@@ -57,14 +57,14 @@ Never commit `.env`, `secrets/`, browser profiles, `work/`, or generated output.
 
 ## Background execution
 
-The included background service is a per-user macOS LaunchAgent. It requires:
+The included background service uses a per-user macOS LaunchAgent or Windows Task Scheduler. It requires:
 
 - A logged-in macOS user session.
 - The machine to be awake, or configured to wake for scheduled work.
 - Valid unattended logins for Codex, Leonardo/Clipchamp, and YouTube.
 - Accessibility/browser permissions if a visible browser fallback is needed.
 
-Run `npm run service:install` after completing authentication. Logs are stored in `work/scheduler.log` and `work/scheduler-error.log`.
+Run `npm run service:install` on Windows or macOS; it automatically selects Windows Task Scheduler or the macOS LaunchAgent. The Windows task starts at logon and keeps the Node scheduler running.
 
 ## Setup sequence
 
@@ -79,5 +79,7 @@ npm run generate            # render-only smoke test
 npm run run-once            # render and upload if enabled
 npm run service:install     # optional recurring background service
 ```
+
+The same `npm run service:install` command works from Windows PowerShell and macOS Terminal.
 
 Review `.env` before the first run. Start with private YouTube uploads and change them to public only after validating the result.
