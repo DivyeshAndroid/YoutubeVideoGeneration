@@ -1,0 +1,23 @@
+{
+  "title": "Three Tiny Habits That Improve Focus",
+  "description": "A short, practical guide to improving focus with small daily habits.",
+  "tags": ["focus", "productivity", "habits"],
+  "hashtags": ["#Shorts", "#Productivity", "#Focus", "#Habits"],
+  "scenes": [
+    {
+      "heading": "Protect your first 20 minutes",
+      "body": "Begin important work before opening messages. Your attention is freshest before the day becomes reactive.",
+      "durationSeconds": 7
+    },
+    {
+      "heading": "Make distraction inconvenient",
+      "body": "Put the phone in another room and close every tab that is unrelated to the current task.",
+      "durationSeconds": 7
+    },
+    {
+      "heading": "Stop while the next step is clear",
+      "body": "End each session by writing one sentence that tells your future self exactly where to resume.",
+      "durationSeconds": 7
+    }
+  ]
+}

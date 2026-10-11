@@ -1,0 +1,35 @@
+{
+  "name": "youtube-video-generation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup": "zsh scripts/bootstrap.sh",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "generate": "npm run build --silent && node dist/cli.js generate",
+    "run-once": "npm run build --silent && node dist/cli.js run-once",
+    "scheduler": "npm run build --silent && node dist/cli.js scheduler",
+    "service:install": "zsh scripts/install-background-service.sh",
+    "service:uninstall": "zsh scripts/uninstall-background-service.sh",
+    "youtube-auth": "npm run build --silent && node dist/cli.js youtube-auth",
+    "doctor": "npm run build --silent && node dist/cli.js doctor",
+    "clipchamp-voice": "npm run build --silent && node dist/cli.js clipchamp-voice",
+    "voicestudio-voice": "npm run build --silent && node dist/cli.js voicestudio-voice",
+    "leonardo-image": "npm run build --silent && node dist/cli.js leonardo-image"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "ffmpeg-static": "^5.2.0",
+    "googleapis": "^160.0.0",
+    "node-cron": "^4.2.1",
+    "playwright-core": "^1.63.0",
+    "sharp": "^0.34.4",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

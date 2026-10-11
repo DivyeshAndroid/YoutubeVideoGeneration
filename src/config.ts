@@ -1,0 +1,85 @@
+import "dotenv/config";
+import path from "node:path";
+import { z } from "zod";
+
+const bool = z.string().default("false").transform((v) => v.toLowerCase() === "true");
+const boolDefaultTrue = z.string().default("true").transform((v) => v.toLowerCase() === "true");
+const envSchema = z.object({
+  CONTENT_FILE: z.string().default("content/example.json"),
+  OUTPUT_DIR: z.string().default("output"),
+  VIDEO_WIDTH: z.coerce.number().int().positive().default(1080),
+  VIDEO_HEIGHT: z.coerce.number().int().positive().default(1920),
+  VIDEO_DURATION_SECONDS: z.coerce.number().int().min(15).max(180).default(60),
+  FPS: z.coerce.number().int().positive().default(30),
+  VIDEO_CRF: z.coerce.number().int().min(0).max(51).default(18),
+  VIDEO_PRESET: z.enum(["ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"]).default("slow"),
+  AUDIO_BITRATE: z.string().regex(/^\d+k$/).default("192k"),
+  CONTENT_MODE: z.enum(["local", "trending"]).default("local"),
+  AI_PROVIDER: z.enum(["codex", "ollama"]).default("codex"),
+  CODEX_COMMAND: z.string().default("codex"),
+  CODEX_MODEL: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  CODEX_REASONING_EFFORT: z.enum(["minimal", "low", "medium", "high", "xhigh"]).default("low"),
+  OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+  OLLAMA_MODEL: z.string().default("qwen3:8b"),
+  COMFYUI_BASE_URL: z.string().url().default("http://127.0.0.1:8188"),
+  COMFYUI_CHECKPOINT: z.string().default("sd_xl_base_1.0.safetensors"),
+  COMFYUI_STEPS: z.coerce.number().int().min(1).max(100).default(24),
+  LEONARDO_HEADLESS: boolDefaultTrue,
+  LEONARDO_USER_DATA_DIR: z.string().default("work/leonardo-profile"),
+  LEONARDO_CHROME_PATH: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  LEONARDO_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
+  LEONARDO_AUTH_TIMEOUT_MS: z.coerce.number().int().positive().default(600000),
+  LEONARDO_GENERATOR_URL: z.string().url().default("https://app.leonardo.ai/generate?model=auto-preset&aspectRatio=1%3A1&style=a5632c7c-ddbb-4e2f-ba34-8456ab3ac436&mode=fast&quantity=1&seedEnabled=false&negativePromptEnabled=false"),
+  LEONARDO_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(5).default(3),
+  PIPER_COMMAND: z.string().default("piper"),
+  PIPER_MODEL: z.string().default("secrets/voices/en_US-lessac-high.onnx"),
+  NARRATION_PROVIDER: z.enum(["local", "clipchamp", "voicestudio"]).default("voicestudio"),
+  CLIPCHAMP_LANGUAGE: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  CLIPCHAMP_VOICE_NAME: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  CLIPCHAMP_HEADLESS: boolDefaultTrue,
+  CLIPCHAMP_USER_DATA_DIR: z.string().default("work/clipchamp-profile"),
+  CLIPCHAMP_CHROME_PATH: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  CLIPCHAMP_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+  VOICESTUDIO_BASE_URL: z.string().url().default("http://127.0.0.1:3900"),
+  VOICESTUDIO_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  VOICESTUDIO_LANGUAGE: z.string().default("Auto"),
+  VOICESTUDIO_PROFILE_ID: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  VOICESTUDIO_INSTRUCT: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  VOICESTUDIO_SPEED: z.coerce.number().min(0.5).max(2).default(1.25),
+  VOICESTUDIO_STEPS: z.coerce.number().int().min(8).max(32).default(16),
+  VOICESTUDIO_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
+  VOICESTUDIO_AUTOSTART: boolDefaultTrue,
+  VOICESTUDIO_APP_PATH: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  VOICESTUDIO_STARTUP_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+  NEWS_TOPIC: z.string().default("technology and artificial intelligence"),
+  NEWS_REGION: z.string().default("global"),
+  NEWS_LOOKBACK_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  NEWS_PROVIDERS: z.string().default("google-rss,gdelt,hacker-news"),
+  NEWS_MAX_ITEMS: z.coerce.number().int().min(5).max(100).default(30),
+  MAX_SCENES: z.coerce.number().int().min(1).max(10).default(5),
+  HASHTAG_COUNT: z.coerce.number().int().min(3).max(15).default(8),
+  IMAGE_MODE: z.enum(["styled", "source", "comfyui", "leonardo"]).default("source"),
+  SCENE_IMAGE_DIR: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  GENERATE_IMAGES: bool,
+  CRON_SCHEDULE: z.string().default("0 9 * * *"),
+  TIMEZONE: z.string().default("Asia/Kolkata"),
+  YOUTUBE_UPLOAD_ENABLED: bool,
+  YOUTUBE_PRIVACY_STATUS: z.enum(["private", "unlisted", "public"]).default("private"),
+  YOUTUBE_CLIENT_SECRET_FILE: z.string().default("secrets/youtube-client-secret.json"),
+  YOUTUBE_TOKEN_FILE: z.string().default("secrets/youtube-token.json")
+});
+
+const env = envSchema.parse(process.env);
+const absolute = (p: string) => path.resolve(process.cwd(), p);
+
+export const config = {
+  ...env,
+  CONTENT_FILE: absolute(env.CONTENT_FILE),
+  OUTPUT_DIR: absolute(env.OUTPUT_DIR),
+  SCENE_IMAGE_DIR: env.SCENE_IMAGE_DIR ? absolute(env.SCENE_IMAGE_DIR) : undefined,
+  YOUTUBE_CLIENT_SECRET_FILE: absolute(env.YOUTUBE_CLIENT_SECRET_FILE),
+  YOUTUBE_TOKEN_FILE: absolute(env.YOUTUBE_TOKEN_FILE),
+  PIPER_MODEL: absolute(env.PIPER_MODEL),
+  CLIPCHAMP_USER_DATA_DIR: absolute(env.CLIPCHAMP_USER_DATA_DIR),
+  LEONARDO_USER_DATA_DIR: absolute(env.LEONARDO_USER_DATA_DIR)
+};

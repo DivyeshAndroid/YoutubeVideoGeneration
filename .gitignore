@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+secrets/
+output/
+work/
+assets/generated/
+*.log
+.DS_Store
