@@ -6,6 +6,7 @@ import { z } from "zod";
 import { config } from "./config.js";
 import type { Scene, VideoContent } from "./types.js";
 import { fetchLatestNews } from "./news.js";
+import { OUTRO_SECONDS, SCENE_TAIL_SECONDS } from "./outro.js";
 
 const outputJsonSchema = {
   type: "object", additionalProperties: false,
@@ -63,7 +64,13 @@ export async function getContent(): Promise<VideoContent> {
   if (config.CONTENT_MODE === "local") return schema.parse(JSON.parse(await fs.readFile(config.CONTENT_FILE, "utf8")));
   const headlines = await fetchLatestNews();
   const prompt = `Using only the supplied news coverage, create one factual vertical YouTube Short covering exactly five distinct hot-news developments about ${config.NEWS_TOPIC}, focused on ${config.NEWS_REGION}. The coverage is ordered by freshness, relevance, and independent publisher corroboration. Select the five strongest distinct stories and preserve that hottest-first order: scene 1 is the hottest, then scenes 2 through 5. Never use multiple scenes for the same event. Write a concise roundup title such as "Top 5 AI & Tech News Today" while making it specific to the actual coverage; make it compelling but never use unsupported "breaking" language, exaggeration, or clickbait. The complete narration must fit within ${config.VIDEO_DURATION_SECONDS} seconds and use 125-145 words across exactly five scenes. Give each story a short factual hook, attribute its claim, and do not merge unrelated facts within a scene. Prefer claims corroborated by different publishers. Treat Hacker News as a discovery signal, not independent factual confirmation. Create ${config.HASHTAG_COUNT} relevant hashtags including #Shorts. Every scene must have a unique cinematic vertical image prompt depicting that scene's specific story, with no text, logos, trademark imitation, or misleading imagery, plus a sourceUrl copied exactly from the supplied coverage supporting that scene. Include the five selected sources in the sources array and use only URLs present below.\n\nNEWS COVERAGE (HOTTEST FIRST):\n${JSON.stringify(headlines, null, 2)}`;
-  const result = config.AI_PROVIDER === "codex" ? await runCodex(prompt) : await runOllama(prompt);
+  const storySeconds = Math.max(3, config.VIDEO_DURATION_SECONDS - OUTRO_SECONDS - 6 * SCENE_TAIL_SECONDS);
+  const wordBudget = Math.floor(storySeconds * 2.2);
+  const timedPrompt = prompt.replace(
+    `The complete narration must fit within ${config.VIDEO_DURATION_SECONDS} seconds and use 125-145 words across exactly five scenes.`,
+    `The five news scenes must fit within ${storySeconds} seconds and use at most ${wordBudget} words including headings. A subscribe ending is added separately; do not write one.`
+  );
+  const result = config.AI_PROVIDER === "codex" ? await runCodex(timedPrompt) : await runOllama(timedPrompt);
   const content = schema.parse(JSON.parse(result));
   if (content.scenes.length !== 5) throw new Error(`Trending news generation must return exactly 5 scenes; received ${content.scenes.length}`);
   return content;

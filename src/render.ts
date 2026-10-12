@@ -5,6 +5,7 @@ import ffmpegPath from "ffmpeg-static";
 import sharp from "sharp";
 import { config } from "./config.js";
 import type { VideoContent } from "./types.js";
+import { SCENE_TAIL_SECONDS } from "./outro.js";
 
 const ffmpeg = ffmpegPath as unknown as string;
 
@@ -39,7 +40,7 @@ export async function renderVideo(content: VideoContent): Promise<string> {
   // their natural speech length plus a small visual tail instead of having
   // their audio stretched to fill an arbitrary one-minute timeline.
   const naturalDurations = content.scenes.map((scene) => scene.audioDurationSeconds
-    ? scene.audioDurationSeconds + 0.25
+    ? scene.audioDurationSeconds + SCENE_TAIL_SECONDS
     : scene.durationSeconds);
   const naturalTotal = naturalDurations.reduce((sum, duration) => sum + duration, 0);
   const durationScale = naturalTotal > config.VIDEO_DURATION_SECONDS
@@ -47,6 +48,7 @@ export async function renderVideo(content: VideoContent): Promise<string> {
     : 1;
   const durations = naturalDurations.map((duration) => duration * durationScale);
   const portrait = config.VIDEO_HEIGHT > config.VIDEO_WIDTH;
+  const storyCount = content.scenes.filter((scene) => scene.kind !== "subscribe").length;
   for (const [index, scene] of content.scenes.entries()) {
     const durationSeconds = Math.max(0.1, durations[index]);
     scene.durationSeconds = durationSeconds;
@@ -62,8 +64,15 @@ export async function renderVideo(content: VideoContent): Promise<string> {
       <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#030712" stop-opacity=".25"/><stop offset="1" stop-color="#030712" stop-opacity=".94"/></linearGradient></defs>
       <rect width="100%" height="100%" fill="url(#g)"/>
       <style>.k{font:600 ${portrait ? 30 : 24}px sans-serif;fill:#c4b5fd}.h{font:700 ${portrait ? 66 : 54}px sans-serif;fill:white}.body{font:${portrait ? 40 : 32}px sans-serif;fill:#e5e7eb}</style>
-      ${titleMarkup}${headingMarkup}${bodyLines}
-      <text x="80" y="${footerY}" class="k">${index + 1} / ${content.scenes.length}  •  #SHORTS</text></svg>`;
+      ${scene.kind === "subscribe" ? `
+        <rect width="100%" height="100%" fill="#101114" fill-opacity=".65"/>
+        <rect x="${config.VIDEO_WIDTH / 2 - 70}" y="${config.VIDEO_HEIGHT * .35 - 48}" width="140" height="96" rx="16" fill="#e62117"/>
+        <path d="M ${config.VIDEO_WIDTH / 2 - 18} ${config.VIDEO_HEIGHT * .35 - 25} l 46 25 l -46 25 z" fill="white"/>
+        <text x="50%" y="${config.VIDEO_HEIGHT * .49}" text-anchor="middle" style="font:700 ${portrait ? 82 : 64}px sans-serif;fill:white">SUBSCRIBE</text>
+        <text x="50%" y="${config.VIDEO_HEIGHT * .49 + 90}" text-anchor="middle" class="body">For more videos</text>
+        <text x="50%" y="${config.VIDEO_HEIGHT * .49 + 155}" text-anchor="middle" class="body">See you in the next Short!</text>
+      ` : `${titleMarkup}${headingMarkup}${bodyLines}`}
+      <text x="80" y="${footerY}" class="k">${scene.kind === "subscribe" ? "#SHORTS" : `${index + 1} / ${storyCount}  •  #SHORTS`}</text></svg>`;
     const image = path.join(workDir, `scene-${index}.png`);
     const segment = path.join(workDir, `segment-${index}.mp4`);
     const canvas = scene.imagePath

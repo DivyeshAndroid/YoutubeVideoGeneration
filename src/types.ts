@@ -1,4 +1,5 @@
 export type Scene = {
+  kind?: "subscribe";
   heading: string;
   body: string;
   durationSeconds: number;

@@ -3,6 +3,7 @@ import { renderVideo } from "./render.js";
 import { uploadVideo } from "./youtube.js";
 import { generateSceneImages } from "./images.js";
 import { generateNarration } from "./narration.js";
+import { appendSubscribeEnding } from "./outro.js";
 import { cleanupPipelineRun } from "./cleanup.js";
 import type { VideoContent } from "./types.js";
 
@@ -11,6 +12,7 @@ export async function runPipeline(upload = true) {
   try {
     content = await getContent();
     content = await generateSceneImages(content);
+    content = appendSubscribeEnding(content);
     content = await generateNarration(content);
     const videoPath = await renderVideo(content);
     console.log(`Video created: ${videoPath}`);

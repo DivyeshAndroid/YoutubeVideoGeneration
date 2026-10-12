@@ -7,6 +7,7 @@ import type { VideoContent } from "./types.js";
 import { ClipchampVoiceService } from "./clipchamp.js";
 import { rephraseSceneForDuration } from "./content.js";
 import { VoiceStudioService } from "./voicestudio.js";
+import { narrationText, SCENE_TAIL_SECONDS } from "./outro.js";
 
 const ffmpeg = ffmpegPath as unknown as string;
 
@@ -78,7 +79,7 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
     const scene = content.scenes[index];
     const output = path.join(narrationDir, `scene-${index}.mp3`);
     const textFile = path.join(narrationDir, `scene-${index}.txt`);
-    await fs.writeFile(textFile, `${scene.heading}. ${scene.body}`, "utf8");
+    await fs.writeFile(textFile, narrationText(scene), "utf8");
     await run(config.EDGE_TTS_PYTHON, [
       "-m", "edge_tts", "--file", textFile, "--voice", config.EDGE_TTS_VOICE,
       `--rate=${config.EDGE_TTS_RATE}`, "--write-media", output
@@ -91,7 +92,7 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
     const scene = content.scenes[index];
     const output = path.join(narrationDir, `scene-${index}.mp3`);
     await clipchamp!.synthesize({
-      text: `${scene.heading}. ${scene.body}`,
+      text: narrationText(scene),
       destinationPath: output,
       language: config.CLIPCHAMP_LANGUAGE,
       voiceName: config.CLIPCHAMP_VOICE_NAME
@@ -103,7 +104,7 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
     const scene = content.scenes[index];
     const output = path.join(narrationDir, `scene-${index}.wav`);
     await voiceStudio!.synthesize({
-      text: `${scene.heading}. ${scene.body}`,
+      text: narrationText(scene),
       destinationPath: output,
       language: config.VOICESTUDIO_LANGUAGE,
       profileId: config.VOICESTUDIO_PROFILE_ID,
@@ -132,7 +133,7 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
   };
   try {
     for (const [index, scene] of content.scenes.entries()) {
-      const narration = `${scene.heading}. ${scene.body}`;
+      const narration = narrationText(scene);
       const output = path.join(narrationDir, `scene-${index}.aac`);
       console.log(`Generating narration ${index + 1}/${content.scenes.length}: ${scene.heading}`);
 
@@ -173,9 +174,10 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
 
     if (clipchamp || voiceStudio || config.NARRATION_PROVIDER === "edge") {
       const maxRephrases = content.scenes.length * 2;
+      const narrationBudget = config.VIDEO_DURATION_SECONDS - content.scenes.length * SCENE_TAIL_SECONDS;
       for (let attempt = 0; attempt < maxRephrases; attempt += 1) {
         const totalDuration = content.scenes.reduce((sum, scene) => sum + (scene.audioDurationSeconds ?? 0), 0);
-        if (totalDuration <= config.VIDEO_DURATION_SECONDS) {
+        if (totalDuration <= narrationBudget) {
           const provider = config.NARRATION_PROVIDER === "edge" ? "Edge TTS" : voiceStudio && !voiceStudioUnavailable ? "VoiceStudio" : "Clipchamp";
           console.log(`${provider} narration duration: ${totalDuration.toFixed(2)}s at configured speed.`);
           break;
@@ -183,12 +185,12 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
 
         const candidates = content.scenes
           .map((scene, index) => ({ index, duration: scene.audioDurationSeconds ?? 0 }))
-          .filter((candidate) => candidate.duration > 3)
+          .filter((candidate) => candidate.duration > 3 && content.scenes[candidate.index].kind !== "subscribe")
           .sort((a, b) => b.duration - a.duration);
         const longest = candidates[0];
         if (!longest) throw new Error("Narration exceeds the video duration and no scene can be shortened further");
 
-        const overflow = totalDuration - config.VIDEO_DURATION_SECONDS;
+        const overflow = totalDuration - narrationBudget;
         const targetDuration = Math.max(3, longest.duration - overflow - 0.5);
         const scene = content.scenes[longest.index];
         console.log(`Narration is ${overflow.toFixed(2)}s too long; rephrasing scene ${longest.index + 1} for ${targetDuration.toFixed(1)}s at 1x speed.`);
@@ -199,7 +201,7 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
 
         if (attempt === maxRephrases - 1) {
           const finalDuration = content.scenes.reduce((sum, item) => sum + (item.audioDurationSeconds ?? 0), 0);
-          if (finalDuration > config.VIDEO_DURATION_SECONDS) {
+          if (finalDuration > narrationBudget) {
             throw new Error(`Could not reduce narration below ${config.VIDEO_DURATION_SECONDS}s at 1x speed; final duration is ${finalDuration.toFixed(2)}s`);
           }
         }
