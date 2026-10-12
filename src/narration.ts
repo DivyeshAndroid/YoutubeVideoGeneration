@@ -59,7 +59,7 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
   const narrationDir = path.resolve("work", "narration", new Date().toISOString().replace(/[:.]/g, "-"));
   await fs.mkdir(narrationDir, { recursive: true });
   // Clipchamp is also kept ready as the automatic fallback for VoiceStudio.
-  const clipchamp = config.NARRATION_PROVIDER !== "local" ? new ClipchampVoiceService({
+  const clipchamp = ["clipchamp", "voicestudio"].includes(config.NARRATION_PROVIDER) ? new ClipchampVoiceService({
     executablePath: config.CLIPCHAMP_CHROME_PATH,
     userDataDir: config.CLIPCHAMP_USER_DATA_DIR,
     headless: config.CLIPCHAMP_HEADLESS,
@@ -74,6 +74,19 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
     startupTimeoutMs: config.VOICESTUDIO_STARTUP_TIMEOUT_MS
   }) : undefined;
   let voiceStudioUnavailable = false;
+  const generateEdgeScene = async (index: number) => {
+    const scene = content.scenes[index];
+    const output = path.join(narrationDir, `scene-${index}.mp3`);
+    const textFile = path.join(narrationDir, `scene-${index}.txt`);
+    await fs.writeFile(textFile, `${scene.heading}. ${scene.body}`, "utf8");
+    await run(config.EDGE_TTS_PYTHON, [
+      "-m", "edge_tts", "--file", textFile, "--voice", config.EDGE_TTS_VOICE,
+      `--rate=${config.EDGE_TTS_RATE}`, "--write-media", output
+    ]);
+    if ((await fs.stat(output)).size < 1024) throw new Error("Edge TTS returned an empty audio file");
+    scene.audioPath = output;
+    scene.audioDurationSeconds = await probeDuration(output);
+  };
   const generateClipchampScene = async (index: number) => {
     const scene = content.scenes[index];
     const output = path.join(narrationDir, `scene-${index}.mp3`);
@@ -102,6 +115,10 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
     scene.audioDurationSeconds = await probeDuration(output);
   };
   const generateServiceScene = async (index: number) => {
+    if (config.NARRATION_PROVIDER === "edge") {
+      await generateEdgeScene(index);
+      return;
+    }
     if (voiceStudio && !voiceStudioUnavailable) {
       try {
         await generateVoiceStudioScene(index);
@@ -120,7 +137,7 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
       console.log(`Generating narration ${index + 1}/${content.scenes.length}: ${scene.heading}`);
 
       try {
-        if (clipchamp) {
+        if (clipchamp || config.NARRATION_PROVIDER === "edge") {
           await generateServiceScene(index);
         } else {
           const wav = path.join(narrationDir, `scene-${index}.wav`);
@@ -144,21 +161,22 @@ export async function generateNarration(content: VideoContent): Promise<VideoCon
           }
         }
 
-        if (!clipchamp && (await fs.stat(output)).size > 1024) {
+        if (!clipchamp && config.NARRATION_PROVIDER !== "edge" && (await fs.stat(output)).size > 1024) {
           scene.audioPath = output;
           scene.audioDurationSeconds = await probeDuration(output);
         }
       } catch (error) {
+        if (config.NARRATION_PROVIDER === "edge") throw error;
         console.warn(`Narration unavailable for scene ${index + 1}; silence will be used.`, error);
       }
     }
 
-    if (clipchamp || voiceStudio) {
+    if (clipchamp || voiceStudio || config.NARRATION_PROVIDER === "edge") {
       const maxRephrases = content.scenes.length * 2;
       for (let attempt = 0; attempt < maxRephrases; attempt += 1) {
         const totalDuration = content.scenes.reduce((sum, scene) => sum + (scene.audioDurationSeconds ?? 0), 0);
         if (totalDuration <= config.VIDEO_DURATION_SECONDS) {
-          const provider = voiceStudio && !voiceStudioUnavailable ? "VoiceStudio" : "Clipchamp";
+          const provider = config.NARRATION_PROVIDER === "edge" ? "Edge TTS" : voiceStudio && !voiceStudioUnavailable ? "VoiceStudio" : "Clipchamp";
           console.log(`${provider} narration duration: ${totalDuration.toFixed(2)}s at configured speed.`);
           break;
         }

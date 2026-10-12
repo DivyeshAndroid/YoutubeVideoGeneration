@@ -55,7 +55,7 @@ export async function doctor() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return `${config.COMFYUI_CHECKPOINT} configured`;
     }]);
-  if (config.IMAGE_MODE === "leonardo") {
+  if (["source", "leonardo"].includes(config.IMAGE_MODE) && config.GENERATE_IMAGES && !config.SCENE_IMAGE_DIR) {
     checks.push(["Chrome for Leonardo", async () => accessibleFile(config.LEONARDO_CHROME_PATH ?? defaultChromePath() ?? "Chrome executable not detected; set LEONARDO_CHROME_PATH")]);
   }
   if (config.NARRATION_PROVIDER === "voicestudio") {
@@ -66,7 +66,10 @@ export async function doctor() {
     checks.push(["YouTube OAuth client", async () => accessibleFile(config.YOUTUBE_CLIENT_SECRET_FILE)]);
     checks.push(["YouTube OAuth token", async () => accessibleFile(config.YOUTUBE_TOKEN_FILE)]);
   }
-  checks.push(["Piper voice", async () => {
+  if (config.NARRATION_PROVIDER === "edge") {
+    checks.push(["Edge neural narration", () => commandVersion(config.EDGE_TTS_PYTHON, ["-m", "edge_tts", "--version"])]);
+  }
+  if (config.NARRATION_PROVIDER === "local") checks.push(["Piper voice", async () => {
       await fs.access(config.PIPER_MODEL);
       return config.PIPER_MODEL;
     }, true]);

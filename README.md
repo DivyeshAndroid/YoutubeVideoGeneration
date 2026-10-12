@@ -19,7 +19,7 @@ See [PREREQUISITES.md](PREREQUISITES.md) for the complete machine, account, auth
 The default script engine is the installed Codex CLI. It uses your existing Codex/ChatGPT sign-in and does not require an OpenAI API key or a large model on your computer. RSS supplies the factual news inputs, and `codex exec` returns the script through a strict JSON schema.
 
 - **Script and hashtags:** Codex CLI in non-interactive mode.
-- **Images:** Article Open Graph images by default, with an automatic styled fallback. ComfyUI remains optional.
+- **Images:** Article Open Graph images by default, with automatic Leonardo generation when publisher images are unavailable. ComfyUI remains optional.
 - **Narration:** macOS `say` works without a model download. Piper with `en_US-lessac-high` remains an optional quality upgrade.
 - **Current news:** keyless Google News RSS; internet access is needed only to download headlines, not to run the AI models.
 
@@ -48,7 +48,7 @@ The configured production flow creates a five-story roundup: exactly five distin
 
 ### Image modes
 
-- `IMAGE_MODE=source` downloads the article's `og:image` or Twitter image and uses it for the scene tied to that exact source URL.
+- `IMAGE_MODE=source` downloads the article's `og:image` or Twitter image and uses it for the scene tied to that exact source URL. If the source URL or publisher image is unavailable, Leonardo generates that scene's visual using the existing editorial strategy and retry logic. If Leonardo also fails, the run stops rather than rendering a missing image.
 - `IMAGE_MODE=styled` makes no image downloads and uses the built-in animated design.
 - `IMAGE_MODE=comfyui` generates each scene locally from its narration-derived image prompt.
 - `IMAGE_MODE=leonardo` generates scene images from their prompts through Leonardo's web application.
@@ -90,6 +90,23 @@ npm run clipchamp-voice -- "Text to narrate" output/voice.mp3 "English (United S
 Clipchamp is a browser UI rather than a stable public text-to-speech API, so Microsoft UI changes may require locator updates in `src/clipchamp.ts`.
 
 For an offline fallback, set `NARRATION_PROVIDER=local` and configure `PIPER_COMMAND` and `PIPER_MODEL`. On macOS, the built-in `say` voice is used if Piper is unavailable.
+
+For neural presenter narration, install `python -m pip install -r requirements-tts.txt` and set `NARRATION_PROVIDER=edge`, `EDGE_TTS_PYTHON=python`, `EDGE_TTS_VOICE=en-US-GuyNeural`, and `EDGE_TTS_RATE=+0%`. Set `EDGE_TTS_PYTHON` to your virtual environment's Python executable when using one. This provider requires internet access and sends narration text to Microsoft's online speech service. It supports voice and pace selection, but does not expose Azure's explicit newscast style. Generation stops on a speech failure so it cannot silently produce an unvoiced video.
+
+### Windows configuration
+
+The Windows example enables trending news, neural presenter narration, publisher images with Leonardo fallback, and generation every three hours at 01:00, 04:00, 07:00, 10:00, 13:00, 16:00, 19:00, and 22:00 Asia/Kolkata. Uploading remains disabled. To configure a fresh checkout in PowerShell:
+
+```powershell
+npm.cmd ci
+python -m venv work/edge-tts-venv
+work/edge-tts-venv/Scripts/python.exe -m pip install -r requirements-tts.txt
+Copy-Item .env.windows.example .env
+npm.cmd run doctor
+npm.cmd run service:install
+```
+
+Complete Leonardo sign-in in the project's Chrome profile through to the image generator, then close the window. Normal runs reuse that session. The Windows scheduled task runs hidden, restarts at sign-in, and writes its output to `work/logs/scheduler.log`. Use `npm.cmd run generate` for a local preview without uploading. Run the image fallback tests with `node --import tsx --test tests/images.test.ts`.
 
 With `NARRATION_PROVIDER=voicestudio`, the service calls VoiceStudio's local API and starts a standard macOS or Windows installation automatically when needed. Choose a saved clone or designed voice with `VOICESTUDIO_PROFILE_ID`; leave it blank to use VoiceStudio's default. `VOICESTUDIO_LANGUAGE`, `VOICESTUDIO_INSTRUCT`, `VOICESTUDIO_SPEED` (1.25× by default), and `VOICESTUDIO_STEPS` control pronunciation, delivery, speed, and quality. A VoiceStudio failure disables further retries during that run and sends the current and remaining scenes to Clipchamp.
 

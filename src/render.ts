@@ -56,11 +56,13 @@ export async function renderVideo(content: VideoContent): Promise<string> {
     const bodyY = headingY + headingLines.length * (portrait ? 78 : 64) + (portrait ? 55 : 40);
     const footerY = config.VIDEO_HEIGHT - 70;
     const bodyLines = wrap(scene.body, portrait ? 30 : 48).map((line, i) => `<text x="80" y="${bodyY + i * (portrait ? 64 : 54)}" class="body">${esc(line)}</text>`).join("");
+    const titleMarkup = wrap(content.title.toUpperCase(), portrait ? 48 : 64)
+      .map((line, i) => `<text x="80" y="${115 + i * (portrait ? 42 : 34)}" class="k">${esc(line)}</text>`).join("");
     const svg = `<svg width="${config.VIDEO_WIDTH}" height="${config.VIDEO_HEIGHT}" xmlns="http://www.w3.org/2000/svg">
       <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#030712" stop-opacity=".25"/><stop offset="1" stop-color="#030712" stop-opacity=".94"/></linearGradient></defs>
       <rect width="100%" height="100%" fill="url(#g)"/>
       <style>.k{font:600 ${portrait ? 30 : 24}px sans-serif;fill:#c4b5fd}.h{font:700 ${portrait ? 66 : 54}px sans-serif;fill:white}.body{font:${portrait ? 40 : 32}px sans-serif;fill:#e5e7eb}</style>
-      <text x="80" y="115" class="k">${esc(content.title.toUpperCase())}</text>${headingMarkup}${bodyLines}
+      ${titleMarkup}${headingMarkup}${bodyLines}
       <text x="80" y="${footerY}" class="k">${index + 1} / ${content.scenes.length}  •  #SHORTS</text></svg>`;
     const image = path.join(workDir, `scene-${index}.png`);
     const segment = path.join(workDir, `segment-${index}.mp4`);

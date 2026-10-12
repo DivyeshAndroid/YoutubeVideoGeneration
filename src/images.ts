@@ -103,7 +103,7 @@ export async function generateSceneImages(content: VideoContent): Promise<VideoC
   if (!config.GENERATE_IMAGES || config.IMAGE_MODE === "styled") return content;
   const imageDir = path.resolve("work", "generated-images", new Date().toISOString().replace(/[:.]/g, "-"));
   await fs.mkdir(imageDir, { recursive: true });
-  const leonardo = config.IMAGE_MODE === "leonardo" ? new LeonardoImageService({
+  const leonardo = ["source", "leonardo"].includes(config.IMAGE_MODE) ? new LeonardoImageService({
     executablePath: config.LEONARDO_CHROME_PATH,
     userDataDir: config.LEONARDO_USER_DATA_DIR,
     headless: config.LEONARDO_HEADLESS,
@@ -112,33 +112,38 @@ export async function generateSceneImages(content: VideoContent): Promise<VideoC
     generatorUrl: config.LEONARDO_GENERATOR_URL,
     maxAttempts: config.LEONARDO_MAX_ATTEMPTS
   }) : undefined;
+  const generateLeonardoScene = async (index: number) => {
+    const scene = content.scenes[index];
+    const imagePath = path.join(imageDir, `scene-${index}.png`);
+    const selected = leonardoPrompt(content, index);
+    console.log(`Generating Leonardo image ${index + 1}/${content.scenes.length} [auto model, ${selected.strategy}]: ${scene.heading}`);
+    await leonardo!.generate({
+      prompt: `${selected.prompt} No text, no logo, no watermark, original composition with safe margins for vertical 9:16 cropping.`,
+      destinationPath: imagePath
+    });
+    scene.imagePath = imagePath;
+  };
   try {
   for (const [index, scene] of content.scenes.entries()) {
     if (config.IMAGE_MODE === "source") {
-      if (!scene.sourceUrl) continue;
       scene.imagePath = undefined;
       const imagePath = path.join(imageDir, `scene-${index}.source`);
       try {
+        if (!scene.sourceUrl) throw new Error("Scene has no publisher source URL");
         console.log(`Fetching source image ${index + 1}/${content.scenes.length}: ${scene.heading}`);
         await downloadSourceImage(scene.sourceUrl, imagePath);
         scene.imagePath = imagePath;
       } catch (error) {
-        console.warn(`Source image unavailable for scene ${index + 1}; using styled fallback.`, error);
+        console.warn(`Source image unavailable for scene ${index + 1}; using Leonardo fallback.`, error);
+        await generateLeonardoScene(index);
       }
       continue;
     }
-    if (!scene.imagePrompt) continue;
     if (leonardo) {
-      const imagePath = path.join(imageDir, `scene-${index}.png`);
-      const selected = leonardoPrompt(content, index);
-      console.log(`Generating Leonardo image ${index + 1}/${content.scenes.length} [auto model, ${selected.strategy}]: ${scene.heading}`);
-      await leonardo.generate({
-        prompt: `${selected.prompt} No text, no logo, no watermark, original composition with safe margins for vertical 9:16 cropping.`,
-        destinationPath: imagePath
-      });
-      scene.imagePath = imagePath;
+      await generateLeonardoScene(index);
       continue;
     }
+    if (!scene.imagePrompt) continue;
     console.log(`Generating local image ${index + 1}/${content.scenes.length}: ${scene.heading}`);
     const prefix = `youtube-news-${randomUUID()}`;
     let queued: Response;
