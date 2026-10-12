@@ -62,6 +62,7 @@ const envSchema = z.object({
   NEWS_LOOKBACK_HOURS: z.coerce.number().int().min(1).max(168).default(24),
   NEWS_PROVIDERS: z.string().default("google-rss,gdelt,hacker-news"),
   NEWS_MAX_ITEMS: z.coerce.number().int().min(5).max(100).default(30),
+  NEWS_HISTORY_FILE: z.string().default("work/news-history.json"),
   MAX_SCENES: z.coerce.number().int().min(1).max(10).default(5),
   HASHTAG_COUNT: z.coerce.number().int().min(3).max(15).default(8),
   IMAGE_MODE: z.enum(["styled", "source", "comfyui", "leonardo"]).default("source"),

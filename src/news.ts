@@ -1,6 +1,7 @@
 import { config } from "./config.js";
+import { BHASKAR_WORLD_URL, GLOBAL_NEWS_FEEDS, parseBhaskarWorld, parseWorldFeed } from "./news-sources.js";
 
-export type NewsProvider = "google-rss" | "gdelt" | "hacker-news";
+export type NewsProvider = "bhaskar" | "world-rss" | "google-rss" | "gdelt" | "hacker-news";
 
 export type NewsItem = {
   title: string;
@@ -8,6 +9,7 @@ export type NewsItem = {
   publishedAt: string;
   source: string;
   provider: NewsProvider;
+  summary?: string;
 };
 
 const decodeXml = (value: string) => value
@@ -117,19 +119,17 @@ function hostname(value?: string): string {
   catch { return ""; }
 }
 
-function normalizedTitle(title: string): string {
+export function normalizedTitle(title: string): string {
   return title.toLowerCase()
     .replace(/\s+[-–—|]\s+[^-–—|]+$/, "")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
-function canonicalUrl(value: string): string {
+export function canonicalUrl(value: string): string {
   try {
     const url = new URL(value);
-    for (const key of [...url.searchParams.keys()]) {
-      if (/^(utm_|fbclid|gclid)/i.test(key)) url.searchParams.delete(key);
-    }
+    url.search = "";
     url.hash = "";
     return url.toString().replace(/\/$/, "");
   } catch { return value; }
@@ -160,8 +160,8 @@ function rank(item: NewsItem, corroborationCount = 0): number {
   return relevance + freshness * 4 + corroborationCount * 2 + (item.provider === "google-rss" ? 0.2 : 0);
 }
 
-/** Fetch, normalize, deduplicate, and rank recent coverage from independent free providers. */
-export async function fetchLatestNews(): Promise<NewsItem[]> {
+/** Preserve the existing discovery sources as the final fallback. */
+async function fetchExistingNews(): Promise<NewsItem[]> {
   const enabled = new Set(config.NEWS_PROVIDERS.split(",").map((value) => value.trim()).filter(Boolean));
   const allProviders: Array<[NewsProvider, () => Promise<NewsItem[]>]> = [
     ["google-rss", fetchGoogleNews],
@@ -210,4 +210,59 @@ export async function fetchLatestNews(): Promise<NewsItem[]> {
       return true;
     })
     .slice(0, config.NEWS_MAX_ITEMS);
+}
+
+export class NoFreshNewsError extends Error {
+  constructor(count: number) {
+    super(`Only ${count} unseen recent stories available across all sources; skipping this video rather than repeating news.`);
+    this.name = "NoFreshNewsError";
+  }
+}
+
+export type NewsTier = { name: string; load: () => Promise<NewsItem[]> };
+
+export async function collectFreshNews(
+  tiers: NewsTier[],
+  filterUnseen: (items: NewsItem[]) => Promise<NewsItem[]>,
+  now = Date.now()
+): Promise<NewsItem[]> {
+  let candidates: NewsItem[] = [];
+  const cutoff = now - config.NEWS_LOOKBACK_HOURS * 3_600_000;
+  for (const tier of tiers) {
+    let items: NewsItem[];
+    try { items = await tier.load(); }
+    catch (error) { console.warn(`News source ${tier.name} unavailable:`, error); continue; }
+    const seenUrls = new Set(candidates.map((item) => canonicalUrl(item.url)));
+    const seenTitles = new Set(candidates.map((item) => normalizedTitle(item.title)));
+    const fresh = items.filter((item) => {
+      const time = Date.parse(item.publishedAt);
+      const url = canonicalUrl(item.url);
+      const title = normalizedTitle(item.title);
+      if (!title || !Number.isFinite(time) || time < cutoff || time > now + 300_000
+        || seenUrls.has(url) || seenTitles.has(title)) return false;
+      seenUrls.add(url); seenTitles.add(title);
+      return true;
+    });
+    // Filtering errors fail closed: do not silently disable duplicate protection.
+    candidates = (await filterUnseen([...candidates, ...fresh])).slice(0, config.NEWS_MAX_ITEMS);
+    console.log(`News source ${tier.name}: ${fresh.length} recent items; ${candidates.length} unseen stories available.`);
+    if (candidates.length >= 5) return candidates;
+  }
+  throw new NoFreshNewsError(candidates.length);
+}
+
+export async function fetchLatestNews(filterUnseen: (items: NewsItem[]) => Promise<NewsItem[]>): Promise<NewsItem[]> {
+  return collectFreshNews([
+    { name: "Dainik Bhaskar world", load: async () => {
+      const response = await request(BHASKAR_WORLD_URL);
+      if (!response.ok) throw new Error(`Bhaskar returned HTTP ${response.status}`);
+      return parseBhaskarWorld(await response.text());
+    } },
+    ...GLOBAL_NEWS_FEEDS.map((feed) => ({ name: feed.source, load: async () => {
+      const response = await request(feed.url);
+      if (!response.ok) throw new Error(`${feed.source} returned HTTP ${response.status}`);
+      return parseWorldFeed(await response.text(), feed.source);
+    } })),
+    { name: "existing Google/GDELT/Hacker News sources", load: fetchExistingNews }
+  ], filterUnseen);
 }

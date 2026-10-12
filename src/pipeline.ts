@@ -6,8 +6,10 @@ import { generateNarration } from "./narration.js";
 import { appendSubscribeEnding } from "./outro.js";
 import { cleanupPipelineRun } from "./cleanup.js";
 import type { VideoContent } from "./types.js";
+import { acquirePipelineLock, recordUsedStories } from "./news-history.js";
 
 export async function runPipeline(upload = true) {
+  const releaseLock = await acquirePipelineLock();
   let content: VideoContent | undefined;
   try {
     content = await getContent();
@@ -16,6 +18,7 @@ export async function runPipeline(upload = true) {
     content = await generateNarration(content);
     const videoPath = await renderVideo(content);
     console.log(`Video created: ${videoPath}`);
+    await recordUsedStories(content, videoPath);
     const videoId = upload ? await uploadVideo(videoPath, content) : "not-requested";
     console.log(`YouTube result: ${videoId}`);
     return { videoPath, videoId };
@@ -23,5 +26,6 @@ export async function runPipeline(upload = true) {
     await cleanupPipelineRun(content).catch((error) => {
       console.warn("Pipeline cleanup encountered a non-fatal error.", error);
     });
+    await releaseLock();
   }
 }

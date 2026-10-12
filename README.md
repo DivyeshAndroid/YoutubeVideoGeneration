@@ -140,6 +140,14 @@ Uploads are disabled by default. The generated OAuth token is stored under `secr
 
 ## Run recurringly
 
+### World News And Repeat Protection
+
+Trending runs read Dainik Bhaskar's public international page first, preserving its editorial listing order. Locked articles and stale stories are excluded. When fewer than five unseen stories remain, the reader tries BBC World, the Guardian World, and Al Jazeera's public RSS feeds, then the existing Google News/GDELT/Hacker News providers configured by `NEWS_PROVIDERS`. `NEWS_LOOKBACK_HOURS` applies to every source; listing order is an editorial priority signal, not a measured global popularity ranking.
+
+`NEWS_HISTORY_FILE` defaults to `work/news-history.json`. Completed videos are recorded before upload, including render-only videos. Existing video metadata in `output/` also seeds and recovers the history. Keep the history file when moving machines or removing old outputs. URL/title checks and a multilingual AI event comparison reject previously covered stories, including reworded headlines and reports from other publishers. Duplicate-check errors stop generation; they never disable protection. A process lock prevents overlapping manual and scheduled jobs from selecting the same stories.
+
+If all sources yield fewer than five unseen recent events, that scheduled run is skipped and the next scheduled run tries again. No repeated or invented news is used to fill the video.
+
 Set `CRON_SCHEDULE` and `TIMEZONE` in `.env`, then:
 
 ```bash

@@ -6,6 +6,7 @@ import { doctor } from "./doctor.js";
 import { downloadClipchampVoice } from "./clipchamp.js";
 import { generateLeonardoImage } from "./leonardo.js";
 import { generateVoiceStudioAudio } from "./voicestudio.js";
+import { NoFreshNewsError } from "./news.js";
 
 const command = process.argv[2] ?? "generate";
 
@@ -79,7 +80,11 @@ if (command === "generate") {
       const result = await runPipeline(true);
       console.log(`[${timestamp()} ${config.TIMEZONE}] Scheduled job completed: ${result.videoPath}`);
     } catch (error) {
-      console.error(`[${timestamp()} ${config.TIMEZONE}] Scheduled job failed:`, error);
+      if (error instanceof NoFreshNewsError) {
+        console.log(`[${timestamp()} ${config.TIMEZONE}] Scheduled job skipped: ${error.message}`);
+      } else {
+        console.error(`[${timestamp()} ${config.TIMEZONE}] Scheduled job failed:`, error);
+      }
     } finally { running = false; }
   };
   const task = cron.schedule(config.CRON_SCHEDULE, runJob, { timezone: config.TIMEZONE });

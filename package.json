@@ -21,7 +21,9 @@
     "leonardo-image": "npm run build --silent && node dist/cli.js leonardo-image"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "dotenv": "^17.2.3",
+    "fast-xml-parser": "^5.11.2",
     "ffmpeg-static": "^5.2.0",
     "googleapis": "^160.0.0",
     "node-cron": "^4.2.1",
