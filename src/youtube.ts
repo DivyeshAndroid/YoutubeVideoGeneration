@@ -9,8 +9,13 @@ import type { VideoContent } from "./types.js";
 const scope = ["https://www.googleapis.com/auth/youtube.upload"];
 
 async function oauthClient() {
-  const credentials = JSON.parse(await fsp.readFile(config.YOUTUBE_CLIENT_SECRET_FILE, "utf8"));
+  let credentials;
+  try { credentials = JSON.parse(await fsp.readFile(config.YOUTUBE_CLIENT_SECRET_FILE, "utf8")); }
+  catch (error) {
+    throw new Error(`Cannot load YouTube OAuth client JSON at ${config.YOUTUBE_CLIENT_SECRET_FILE}. Supply this file before enabling publishing.`, { cause: error });
+  }
   const data = credentials.installed ?? credentials.web;
+  if (!data?.client_id || !data?.client_secret) throw new Error("YouTube OAuth client JSON must contain an installed or web OAuth client");
   const client = new google.auth.OAuth2(data.client_id, data.client_secret, "http://localhost:53682/oauth2callback");
   try { client.setCredentials(JSON.parse(await fsp.readFile(config.YOUTUBE_TOKEN_FILE, "utf8"))); } catch { /* auth command creates it */ }
   client.on("tokens", async (tokens) => {
@@ -19,6 +24,16 @@ async function oauthClient() {
     await fsp.writeFile(config.YOUTUBE_TOKEN_FILE, JSON.stringify({ ...current, ...tokens }, null, 2));
   });
   return client;
+}
+
+export async function verifyYouTubeUploadAuthorization(): Promise<void> {
+  if (!config.YOUTUBE_UPLOAD_ENABLED) return;
+  const client = await oauthClient();
+  if (!client.credentials.refresh_token && !client.credentials.access_token) {
+    throw new Error(`YouTube authorization is missing at ${config.YOUTUBE_TOKEN_FILE}. Run npm run youtube-auth and sign in to your channel before publishing.`);
+  }
+  const access = await client.getAccessToken();
+  if (!access.token) throw new Error("YouTube authorization could not obtain an access token; run npm run youtube-auth again");
 }
 
 export async function authorizeYouTube(): Promise<void> {

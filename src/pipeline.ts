@@ -1,6 +1,6 @@
 import { getContent } from "./content.js";
 import { renderVideo } from "./render.js";
-import { uploadVideo } from "./youtube.js";
+import { uploadVideo, verifyYouTubeUploadAuthorization } from "./youtube.js";
 import { generateSceneImages } from "./images.js";
 import { generateNarration } from "./narration.js";
 import { appendSubscribeEnding } from "./outro.js";
@@ -12,6 +12,7 @@ export async function runPipeline(upload = true) {
   const releaseLock = await acquirePipelineLock();
   let content: VideoContent | undefined;
   try {
+    if (upload) await verifyYouTubeUploadAuthorization();
     content = await getContent();
     content = await generateSceneImages(content);
     content = appendSubscribeEnding(content);
