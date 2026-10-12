@@ -106,7 +106,9 @@ export async function generateSceneImages(content: VideoContent): Promise<VideoC
   const leonardo = ["source", "leonardo"].includes(config.IMAGE_MODE) ? new LeonardoImageService({
     executablePath: config.LEONARDO_CHROME_PATH,
     userDataDir: config.LEONARDO_USER_DATA_DIR,
+    profileDirectory: config.LEONARDO_PROFILE_DIRECTORY,
     headless: config.LEONARDO_HEADLESS,
+    interactiveAuthentication: config.LEONARDO_INTERACTIVE_AUTH,
     timeoutMs: config.LEONARDO_TIMEOUT_MS,
     authenticationTimeoutMs: config.LEONARDO_AUTH_TIMEOUT_MS,
     generatorUrl: config.LEONARDO_GENERATOR_URL,

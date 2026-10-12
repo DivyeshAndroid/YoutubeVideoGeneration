@@ -37,6 +37,7 @@ if (command === "generate") {
   const output = await generateLeonardoImage({ prompt, destinationPath }, {
     executablePath: config.LEONARDO_CHROME_PATH,
     userDataDir: config.LEONARDO_USER_DATA_DIR,
+    profileDirectory: config.LEONARDO_PROFILE_DIRECTORY,
     headless: config.LEONARDO_HEADLESS,
     timeoutMs: config.LEONARDO_TIMEOUT_MS,
     authenticationTimeoutMs: config.LEONARDO_AUTH_TIMEOUT_MS,
@@ -69,12 +70,21 @@ if (command === "generate") {
 } else if (command === "scheduler") {
   if (!cron.validate(config.CRON_SCHEDULE)) throw new Error(`Invalid CRON_SCHEDULE: ${config.CRON_SCHEDULE}`);
   let running = false;
-  cron.schedule(config.CRON_SCHEDULE, async () => {
-    if (running) return console.warn("Previous pipeline is still running; skipping this occurrence.");
+  const timestamp = () => new Date().toLocaleString("en-IN", { timeZone: config.TIMEZONE, hour12: false });
+  const runJob = async () => {
+    if (running) return console.warn(`[${timestamp()} ${config.TIMEZONE}] Previous pipeline is still running; skipping this occurrence.`);
     running = true;
-    try { await runPipeline(true); } catch (error) { console.error(error); } finally { running = false; }
-  }, { timezone: config.TIMEZONE });
+    console.log(`[${timestamp()} ${config.TIMEZONE}] Scheduled job started.`);
+    try {
+      const result = await runPipeline(true);
+      console.log(`[${timestamp()} ${config.TIMEZONE}] Scheduled job completed: ${result.videoPath}`);
+    } catch (error) {
+      console.error(`[${timestamp()} ${config.TIMEZONE}] Scheduled job failed:`, error);
+    } finally { running = false; }
+  };
+  const task = cron.schedule(config.CRON_SCHEDULE, runJob, { timezone: config.TIMEZONE });
   console.log(`Scheduler active: ${config.CRON_SCHEDULE} (${config.TIMEZONE})`);
+  console.log(`Next scheduled run: ${task.getNextRun()?.toLocaleString("en-IN", { timeZone: config.TIMEZONE, hour12: false })} (${config.TIMEZONE})`);
 } else {
   throw new Error(`Unknown command: ${command}`);
 }

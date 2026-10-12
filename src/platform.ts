@@ -7,6 +7,16 @@ function firstExisting(candidates: Array<string | undefined>): string | undefine
     .find((candidate) => fs.existsSync(candidate));
 }
 
+export function installedCodexPath(binDir = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, "OpenAI", "Codex", "bin") : ""): string | undefined {
+  if (!binDir || !fs.existsSync(binDir)) return undefined;
+  const candidates = fs.readdirSync(binDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(binDir, entry.name, "codex.exe"))
+    .filter((file) => fs.existsSync(file))
+    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  return candidates[0];
+}
+
 export function defaultChromePath(): string | undefined {
   if (process.platform === "darwin") return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
   if (process.platform !== "win32") return undefined;

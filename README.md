@@ -95,7 +95,7 @@ For neural presenter narration, install `python -m pip install -r requirements-t
 
 ### Windows configuration
 
-The Windows example enables trending news, neural presenter narration, publisher images with Leonardo fallback, and generation every three hours at 01:00, 04:00, 07:00, 10:00, 13:00, 16:00, 19:00, and 22:00 Asia/Kolkata. Uploading remains disabled. To configure a fresh checkout in PowerShell:
+The Windows example enables trending news, neural presenter narration, publisher images with Leonardo fallback, and generation at the start of every hour in Asia/Kolkata. Uploading remains disabled. To configure a fresh checkout in PowerShell:
 
 ```powershell
 npm.cmd ci
@@ -107,6 +107,16 @@ npm.cmd run service:install
 ```
 
 Complete Leonardo sign-in in the project's Chrome profile through to the image generator, then close the window. Normal runs reuse that session. The Windows scheduled task runs hidden, restarts at sign-in, and writes its output to `work/logs/scheduler.log`. Use `npm.cmd run generate` for a local preview without uploading. Run the image fallback tests with `node --import tsx --test tests/images.test.ts`.
+
+On Windows, a bare `CODEX_COMMAND=codex` also discovers the desktop app's installed executable when Codex is absent from the background task's PATH. An explicit executable path is respected. The background runner builds the project and captures stdout and stderr directly, including timestamped job starts, completions, and failures. Run `node scripts/scheduler-runner.mjs --run-once` for an immediate local job logged to `work/logs/job-now.log`.
+
+Unattended jobs fail with a logged authentication error if Leonardo's saved session is missing, instead of repeatedly opening login windows. Complete setup through a manual `npm run leonardo-image` command before relying on unattended image generation.
+
+To run a job with an interactive sign-in window, use `node scripts/scheduler-runner.mjs --run-once --authenticate`. It opens a new window in the project's saved Chrome profile. Finish sign-in through to Leonardo's generator and close that window to resume the job. Hourly jobs remain non-interactive.
+
+To reuse a Chrome profile reserved for testing, close its Chrome windows and run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/import-chrome-profile.ps1 -ProfileDirectory "Profile 6"` with that profile's actual directory name. The script imports its session storage, cookies, and preferences into `work/leonardo-divyesh`. Set `LEONARDO_USER_DATA_DIR=work/leonardo-divyesh` and `LEONARDO_PROFILE_DIRECTORY=Profile 6` in `.env`. A Google/Chrome account sign-in alone does not establish a Leonardo session; verify that the selected profile reaches Leonardo's generator before running unattended jobs.
+
+For Chrome for Testing, set `PLAYWRIGHT_BROWSERS_PATH` to the project's `work/browsers` directory and run `node node_modules/playwright-core/cli.js install chromium --no-shell`. With regular Chrome closed, add `-FullProfile -DestinationRoot <project-path>\work\chrome-for-testing-profile` to the import command. Set `LEONARDO_USER_DATA_DIR=work/chrome-for-testing-profile`, select the copied `LEONARDO_PROFILE_DIRECTORY`, and set `LEONARDO_CHROME_PATH` to the downloaded browser's executable. Copied profiles are local files under ignored `work/`; browser-encrypted login cookies may still require a fresh sign-in in Chrome for Testing.
 
 With `NARRATION_PROVIDER=voicestudio`, the service calls VoiceStudio's local API and starts a standard macOS or Windows installation automatically when needed. Choose a saved clone or designed voice with `VOICESTUDIO_PROFILE_ID`; leave it blank to use VoiceStudio's default. `VOICESTUDIO_LANGUAGE`, `VOICESTUDIO_INSTRUCT`, `VOICESTUDIO_SPEED` (1.25× by default), and `VOICESTUDIO_STEPS` control pronunciation, delivery, speed, and quality. A VoiceStudio failure disables further retries during that run and sends the current and remaining scenes to Clipchamp.
 

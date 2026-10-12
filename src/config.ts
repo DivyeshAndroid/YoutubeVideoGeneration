@@ -1,6 +1,7 @@
 import "dotenv/config";
 import path from "node:path";
 import { z } from "zod";
+import { installedCodexPath } from "./platform.js";
 
 const bool = z.string().default("false").transform((v) => v.toLowerCase() === "true");
 const boolDefaultTrue = z.string().default("true").transform((v) => v.toLowerCase() === "true");
@@ -16,7 +17,7 @@ const envSchema = z.object({
   AUDIO_BITRATE: z.string().regex(/^\d+k$/).default("192k"),
   CONTENT_MODE: z.enum(["local", "trending"]).default("local"),
   AI_PROVIDER: z.enum(["codex", "ollama"]).default("codex"),
-  CODEX_COMMAND: z.string().default("codex"),
+  CODEX_COMMAND: z.string().default("codex").transform((command) => process.platform === "win32" && command === "codex" ? installedCodexPath() ?? command : command),
   CODEX_MODEL: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
   CODEX_REASONING_EFFORT: z.enum(["minimal", "low", "medium", "high", "xhigh"]).default("low"),
   OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
@@ -25,7 +26,9 @@ const envSchema = z.object({
   COMFYUI_CHECKPOINT: z.string().default("sd_xl_base_1.0.safetensors"),
   COMFYUI_STEPS: z.coerce.number().int().min(1).max(100).default(24),
   LEONARDO_HEADLESS: boolDefaultTrue,
+  LEONARDO_INTERACTIVE_AUTH: boolDefaultTrue,
   LEONARDO_USER_DATA_DIR: z.string().default("work/leonardo-profile"),
+  LEONARDO_PROFILE_DIRECTORY: z.string().default("Default"),
   LEONARDO_CHROME_PATH: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
   LEONARDO_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
   LEONARDO_AUTH_TIMEOUT_MS: z.coerce.number().int().positive().default(600000),

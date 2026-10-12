@@ -13,7 +13,9 @@ export type LeonardoImageRequest = {
 export type LeonardoImageServiceOptions = {
   executablePath?: string;
   userDataDir?: string;
+  profileDirectory?: string;
   headless?: boolean;
+  interactiveAuthentication?: boolean;
   timeoutMs?: number;
   authenticationTimeoutMs?: number;
   generatorUrl?: string;
@@ -22,6 +24,14 @@ export type LeonardoImageServiceOptions = {
 
 const defaultChrome = defaultChromePath();
 const defaultGeneratorUrl = "https://app.leonardo.ai/generate?model=auto-preset&aspectRatio=1%3A1&style=a5632c7c-ddbb-4e2f-ba34-8456ab3ac436&mode=fast&quantity=1&seedEnabled=false&negativePromptEnabled=false";
+
+export function isLeonardoGeneratedImage(url: string, contentType: string, contentLength = 0): boolean {
+  const parsed = new URL(url);
+  return /(^|\.)(assets|cdn)\.leonardo\.ai$/i.test(parsed.hostname)
+    && parsed.pathname.includes("/generations/")
+    && /^image\/(png|jpe?g|webp|avif)/i.test(contentType)
+    && (contentLength === 0 || contentLength > 10_000);
+}
 
 type GenerationFailureKind = "moderation" | "credits" | "rate-limit" | "authentication" | "generation";
 
@@ -38,7 +48,9 @@ export class LeonardoImageService {
   private page?: Page;
   private readonly executablePath?: string;
   private readonly userDataDir: string;
+  private readonly profileDirectory: string;
   private readonly headless: boolean;
+  private readonly interactiveAuthentication: boolean;
   private readonly timeoutMs: number;
   private readonly authenticationTimeoutMs: number;
   private readonly generatorUrl: string;
@@ -47,7 +59,9 @@ export class LeonardoImageService {
   constructor(options: LeonardoImageServiceOptions = {}) {
     this.executablePath = options.executablePath ?? defaultChrome;
     this.userDataDir = path.resolve(options.userDataDir ?? "work/leonardo-profile");
+    this.profileDirectory = options.profileDirectory ?? "Default";
     this.headless = options.headless ?? true;
+    this.interactiveAuthentication = options.interactiveAuthentication ?? true;
     this.timeoutMs = options.timeoutMs ?? 300_000;
     this.authenticationTimeoutMs = options.authenticationTimeoutMs ?? 600_000;
     this.generatorUrl = options.generatorUrl ?? defaultGeneratorUrl;
@@ -58,7 +72,13 @@ export class LeonardoImageService {
     if (this.context) return;
     await this.launch(this.headless);
     await this.openGenerator();
-    if (await this.isAuthenticationRequired()) await this.refreshAuthentication();
+    if (await this.isAuthenticationRequired()) {
+      if (!this.interactiveAuthentication) {
+        await this.saveDiagnostics(0, "", new Error("Leonardo sign-in is required"));
+        throw new Error("Leonardo sign-in is required in the project's Chrome profile. Run npm run leonardo-image with a prompt and destination, complete Leonardo sign-in, then close its Chrome window. Unattended jobs do not open login windows.");
+      }
+      await this.refreshAuthentication();
+    }
   }
 
   async close(): Promise<void> {
@@ -101,25 +121,55 @@ export class LeonardoImageService {
       page.getByPlaceholder(/prompt|describe|imagine/i)
     ).or(page.locator("textarea:visible")).last();
     await promptBox.waitFor({ state: "visible" });
+    await page.locator('img[src*="/generations/"]').first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => undefined);
+    const existingImage = await page.locator("img").evaluateAll((images, expectedPrompt) =>
+      images.find((image) => image.getAttribute("alt") === expectedPrompt && image.getAttribute("src")?.includes("/generations/"))?.getAttribute("src"), prompt);
+    if (existingImage && isLeonardoGeneratedImage(existingImage, "image/jpeg")) {
+      const existingResponse = await this.context!.request.get(existingImage, {
+        headers: { accept: "image/jpeg,image/png,image/webp" }
+      }).catch(() => undefined);
+      if (existingResponse?.ok()) {
+        const image = await existingResponse.body();
+        if (image.length > 10_000) {
+          console.log("Reusing a Leonardo image matching this scene's exact prompt.");
+          return image;
+        }
+      }
+    }
     await promptBox.fill(prompt);
 
     const imageResult = page.waitForResponse(async (response) => {
       if (!response.ok()) return false;
-      const url = new URL(response.url());
       const contentType = (await response.headerValue("content-type")) ?? "";
       const contentLength = Number((await response.headerValue("content-length")) ?? 0);
-      return /(^|\.)assets\.leonardo\.ai$/i.test(url.hostname)
-        && /^image\/(png|jpe?g|webp)/i.test(contentType)
-        && (contentLength === 0 || contentLength > 50_000);
-    }, { timeout: this.timeoutMs }).then(async (response) => ({ kind: "image" as const, image: Buffer.from(await response.body()) }));
-    const visibleError = page.locator('[role="alert"]:visible, [data-sonner-toast]:visible, [class*="toast"]:visible')
-      .filter({ hasText: /moderation|content policy|not allowed|unsafe|failed|error|something went wrong|try again|token|credit|upgrade|rate limit|too many/i })
-      .last()
-      .waitFor({ state: "visible", timeout: this.timeoutMs })
-      .then(async () => ({ kind: "error" as const, message: await page.locator('[role="alert"]:visible, [data-sonner-toast]:visible, [class*="toast"]:visible').last().innerText() }));
+      if (!isLeonardoGeneratedImage(response.url(), contentType, contentLength)) return false;
+      return page.getByAltText(prompt, { exact: true }).evaluateAll((images, imageUrl) =>
+        images.some((image) => (image as HTMLImageElement).src === imageUrl), response.url());
+    }, { timeout: this.timeoutMs }).then(async (response) => {
+      // Chrome may negotiate AVIF that the local image decoder cannot read.
+      const download = await this.context!.request.get(response.url(), {
+        headers: { accept: "image/jpeg,image/png,image/webp" }
+      });
+      if (!download.ok()) throw new Error(`Leonardo image download failed: HTTP ${download.status()}`);
+      return { kind: "image" as const, image: Buffer.from(await download.body()) };
+    });
+    const alertSelector = '[role="alert"], [data-sonner-toast], [class*="toast"]';
+    const previousAlerts = await page.evaluateHandle((selector) => new Set(document.querySelectorAll(selector)), alertSelector);
+    const visibleError = page.waitForFunction(({ previous, selector }) => {
+      for (const alert of document.querySelectorAll(selector)) {
+        if (previous.has(alert) || !(alert as HTMLElement).offsetParent) continue;
+        const message = alert.textContent ?? "";
+        if (/moderation|content policy|content safety|guidelines|not allowed|unsafe|failed|error|something went wrong|try again|token|credit|upgrade|rate limit|too many/i.test(message)) return message;
+      }
+      return false;
+    }, { previous: previousAlerts, selector: alertSelector }, { timeout: this.timeoutMs })
+      .then(async (message) => ({ kind: "error" as const, message: String(await message.jsonValue()) }));
 
+    const generationResult = Promise.race([imageResult, visibleError]);
+    // Both event waits must be handled even if the Generate button cannot be clicked.
+    void generationResult.catch(() => undefined);
     await page.getByRole("button", { name: /^generate(?: image)?$/i }).last().click();
-    const result = await Promise.race([imageResult, visibleError]);
+    const result = await generationResult;
     if (result.kind === "error") throw new Error(result.message);
     if (result.image.length < 10_000) throw new Error("Leonardo returned an unexpectedly small image");
     return result.image;
@@ -129,6 +179,7 @@ export class LeonardoImageService {
     await fs.mkdir(this.userDataDir, { recursive: true });
     this.context = await chromium.launchPersistentContext(this.userDataDir, {
       executablePath: this.executablePath,
+      args: [`--profile-directory=${this.profileDirectory}`],
       headless,
       acceptDownloads: true,
       viewport: { width: 1440, height: 1000 }
@@ -177,6 +228,8 @@ export class LeonardoImageService {
     if (!this.executablePath) throw new Error("A Chrome executable path is required for interactive Leonardo authentication");
     const child = spawn(this.executablePath, [
       `--user-data-dir=${this.userDataDir}`,
+      `--profile-directory=${this.profileDirectory}`,
+      "--new-window",
       "--no-first-run",
       "--no-default-browser-check",
       this.generatorUrl
