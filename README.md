@@ -91,7 +91,7 @@ Clipchamp is a browser UI rather than a stable public text-to-speech API, so Mic
 
 For an offline fallback, set `NARRATION_PROVIDER=local` and configure `PIPER_COMMAND` and `PIPER_MODEL`. On macOS, the built-in `say` voice is used if Piper is unavailable.
 
-For neural presenter narration, install `python -m pip install -r requirements-tts.txt` and set `NARRATION_PROVIDER=edge`, `EDGE_TTS_PYTHON=python`, `EDGE_TTS_VOICE=en-US-GuyNeural`, and `EDGE_TTS_RATE=+0%`. Set `EDGE_TTS_PYTHON` to your virtual environment's Python executable when using one. This provider requires internet access and sends narration text to Microsoft's online speech service. It supports voice and pace selection, but does not expose Azure's explicit newscast style. Generation stops on a speech failure so it cannot silently produce an unvoiced video.
+For neural presenter narration, install `python -m pip install -r requirements-tts.txt` and set `NARRATION_PROVIDER=edge`, `EDGE_TTS_PYTHON=python`, `EDGE_TTS_VOICE=en-US-AriaNeural`, and `EDGE_TTS_RATE=+0%`. Edge narration permits only the female Aria and Jenny voices; Clipchamp permits Aria and Jenny and defaults to Aria. Windows system narration explicitly selects a female voice. VoiceStudio defaults to an adult female presenter instruction; custom voice profiles and local Piper models must also be female if those providers are used. Set `EDGE_TTS_PYTHON` to your virtual environment's Python executable when using one. This provider requires internet access and sends narration text to Microsoft's online speech service. It supports voice and pace selection, but does not expose Azure's explicit newscast style. Generation stops on a speech failure so it cannot silently produce an unvoiced video.
 
 ### Windows configuration
 

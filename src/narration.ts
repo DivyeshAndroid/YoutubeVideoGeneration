@@ -32,6 +32,8 @@ function windowsSpeech(text: string, destination: string): Promise<void> {
   const script = [
     "Add-Type -AssemblyName System.Speech",
     "$voice = New-Object System.Speech.Synthesis.SpeechSynthesizer",
+    "$voice.SelectVoiceByHints([System.Speech.Synthesis.VoiceGender]::Female, [System.Speech.Synthesis.VoiceAge]::Adult)",
+    "if ($voice.Voice.Gender -ne [System.Speech.Synthesis.VoiceGender]::Female) { throw 'No female Windows voice is available' }",
     `$voice.Rate = ${Math.max(-10, Math.min(10, Math.round((config.VOICESTUDIO_SPEED - 1) * 10)))}`,
     `$voice.SetOutputToWaveFile('${destination.replace(/'/g, "''")}')`,
     "$inputText = [Console]::In.ReadToEnd()",
