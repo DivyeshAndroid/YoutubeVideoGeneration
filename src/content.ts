@@ -41,7 +41,7 @@ async function runCodex(prompt: string, responseSchema: object = outputJsonSchem
   await new Promise<void>((resolve, reject) => {
     const child = spawn(config.CODEX_COMMAND, args, { cwd: process.cwd(), stdio: ["pipe", "inherit", "inherit"] });
     child.on("error", (error) => reject(new Error(`Cannot run Codex CLI command '${config.CODEX_COMMAND}'.`, { cause: error })));
-    child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`Codex CLI exited with code ${code}. Run 'codex login' and try again.`)));
+    child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`Codex CLI exited with code ${code}. Check the preceding error for model access, authentication, or service failures (configured model: ${config.CODEX_MODEL}).`)));
     child.stdin.end(prompt);
   });
   return fs.readFile(outputPath, "utf8");

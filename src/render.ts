@@ -75,8 +75,9 @@ export async function renderVideo(content: VideoContent): Promise<string> {
       <text x="80" y="${footerY}" class="k">${scene.kind === "subscribe" ? "#SHORTS" : `${index + 1} / ${storyCount}  •  #SHORTS`}</text></svg>`;
     const image = path.join(workDir, `scene-${index}.png`);
     const segment = path.join(workDir, `segment-${index}.mp4`);
+    // Buffer input avoids libvips retaining a Windows file handle after rendering.
     const canvas = scene.imagePath
-      ? sharp(scene.imagePath).resize(config.VIDEO_WIDTH, config.VIDEO_HEIGHT, { fit: "cover" })
+      ? sharp(await fs.readFile(scene.imagePath)).resize(config.VIDEO_WIDTH, config.VIDEO_HEIGHT, { fit: "cover" })
       : sharp({ create: { width: config.VIDEO_WIDTH, height: config.VIDEO_HEIGHT, channels: 4, background: "#312e81" } });
     await canvas.composite([{ input: Buffer.from(svg) }]).png().toFile(image);
     const narrated = Boolean(scene.audioPath);

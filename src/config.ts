@@ -18,7 +18,7 @@ const envSchema = z.object({
   CONTENT_MODE: z.enum(["local", "trending"]).default("local"),
   AI_PROVIDER: z.enum(["codex", "ollama"]).default("codex"),
   CODEX_COMMAND: z.string().default("codex").transform((command) => process.platform === "win32" && command === "codex" ? installedCodexPath() ?? command : command),
-  CODEX_MODEL: z.preprocess((value) => value === "" ? undefined : value, z.string().optional()),
+  CODEX_MODEL: z.preprocess((value) => value === "" ? undefined : value, z.string().default("gpt-6.1-sol")),
   CODEX_REASONING_EFFORT: z.enum(["minimal", "low", "medium", "high", "xhigh"]).default("low"),
   OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
   OLLAMA_MODEL: z.string().default("qwen3:8b"),
